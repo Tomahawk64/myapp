@@ -7,6 +7,6 @@ class ProductService {
 
   Stream<List<Product>> getProducts() {
     return _db.collection('products').snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => Product.fromMap(doc.data())).toList());
+        snapshot.docs.map((doc) => Product.fromJson(doc.data())).toList());
   }
 }

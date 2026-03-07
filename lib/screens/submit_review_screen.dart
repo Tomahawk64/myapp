@@ -17,7 +17,7 @@ class SubmitReviewScreen extends StatefulWidget {
   });
 
   @override
-  _SubmitReviewScreenState createState() => _SubmitReviewScreenState();
+  State<SubmitReviewScreen> createState() => _SubmitReviewScreenState();
 }
 
 class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
@@ -82,28 +82,35 @@ class _SubmitReviewScreenState extends State<SubmitReviewScreen> {
 
                       if (user != null) {
                         final newReview = Review(
-                          userId: user.uid,
-                          panditId: widget.panditId,
-                          bookingId: widget.bookingId,
-                          rating: _rating,
+                          id: '',
+                          userId: user.id,
+                          entityId: widget.panditId,
+                          entityType: 'pandit',
+                          rating: _rating.toDouble(),
                           comment: _comment,
                           createdAt: DateTime.now(),
                         );
 
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
                         try {
                           await ReviewService().createReview(newReview);
-                          Navigator.pop(context); // Go back after successful submission
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Review submitted successfully!'),
-                            ),
-                          );
+                          if (mounted) {
+                            navigator.pop();
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('Review submitted successfully!'),
+                              ),
+                            );
+                          }
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to submit review: $e'),
-                            ),
-                          );
+                          if (mounted) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to submit review: $e'),
+                              ),
+                            );
+                          }
                         }
                       }
                     } else if (_rating == 0) {

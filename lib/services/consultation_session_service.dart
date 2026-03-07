@@ -7,13 +7,12 @@ import '../models/chat_message.dart';
 import '../models/consultation_session.dart';
 import '../models/consultation_status.dart';
 
-class ConsultationService {
+class ConsultationSessionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String _sessionsCollection = 'consultation_sessions';
   final String _messagesCollection = 'chat_messages';
 
   /// Creates a new consultation session in Firestore.
-  /// This only creates the initial record. The timing is handled by `startSession`.
   Future<ConsultationSession> createSession(String userId, String panditId, int duration, double price) async {
     final sessionData = {
       'userId': userId,
@@ -31,9 +30,6 @@ class ConsultationService {
   }
 
   /// Initiates a consultation session.
-  /// IMPORTANT: This implementation updates the status and sets times from the client.
-  /// For a secure, server-authoritative system, this should be converted to a Cloud Function.
-  /// The client should only signal the intent to start, and the server would set the timestamps.
   Future<void> startSession(String sessionId) async {
     final sessionRef = _db.collection(_sessionsCollection).doc(sessionId);
     final sessionDoc = await sessionRef.get();
@@ -61,14 +57,13 @@ class ConsultationService {
     }
     final session = ConsultationSession.fromFirestore(sessionDoc);
 
-    // This check provides good UX, but the definitive security is in Firestore Rules.
     if (session.status != ConsultationStatus.active.name ||
         session.endTime == null ||
         DateTime.now().isAfter(session.endTime!)) {
       throw Exception('This consultation session is not active.');
     }
 
-    await _db.collection(_messagesCollection).add(message.toFirestore());
+    await _db.collection(_messagesCollection).add(message.toJson());
   }
 
   /// Retrieves a stream of all messages for a given session.
@@ -83,8 +78,6 @@ class ConsultationService {
   }
 
   /// Extends an active consultation session by a given number of minutes.
-  /// IMPORTANT: For security (e.g., to link with a payment), this should be a
-  /// callable Cloud Function rather than a direct client update.
   Future<void> extendSession(String sessionId, int extraMinutes) async {
     final sessionRef = _db.collection(_sessionsCollection).doc(sessionId);
 
@@ -106,8 +99,6 @@ class ConsultationService {
   }
 
   /// Ends a consultation session, updating its status.
-  /// This is typically called by the user or pandit. Expired sessions
-  /// should be handled by a server-side process.
   Future<void> endSession(String sessionId, ConsultationStatus status) async {
     await _db.collection(_sessionsCollection).doc(sessionId).update({
       'status': status.name,
@@ -116,14 +107,14 @@ class ConsultationService {
   }
 
   /// Retrieves a real-time stream for a single consultation session.
-  Stream<ConsultationSession> getSessionStream(String sessionId) {
+  Stream<ConsultationSession?> getSessionStream(String sessionId) {
     return _db
         .collection(_sessionsCollection)
         .doc(sessionId)
         .snapshots()
         .map((doc) {
       if (!doc.exists) {
-        throw Exception('Session with ID $sessionId does not exist.');
+        return null;
       }
       return ConsultationSession.fromFirestore(doc);
     });

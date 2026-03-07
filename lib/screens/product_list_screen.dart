@@ -30,6 +30,19 @@ class ProductList extends StatelessWidget {
   Widget build(BuildContext context) {
     final products = Provider.of<List<Product>>(context);
 
+    if (products.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_bag_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('No products available', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+
     return ListView.builder(
       itemCount: products.length,
       itemBuilder: (context, index) {
@@ -58,8 +71,9 @@ class ProductList extends StatelessWidget {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        // ignore: avoid_print
-                        print('Adding ${product.name} to cart');
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${product.name} added to cart')),
+                        );
                       },
                       child: const Text('Add to Cart'),
                     ),

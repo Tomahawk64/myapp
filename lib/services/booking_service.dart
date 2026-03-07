@@ -14,8 +14,6 @@ class BookingService {
       await docRef.set(newBooking.toJson());
       return newBooking;
     } catch (e) {
-      // ignore: avoid_print
-      print('Error creating booking: $e');
       rethrow;
     }
   }
@@ -25,12 +23,10 @@ class BookingService {
     try {
       await _db.collection(_collectionPath).doc(bookingId).update({
         'panditId': panditId,
-        'status': BookingStatus.assigned.toString(),
+        'status': BookingStatus.assigned.name,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      // ignore: avoid_print
-      print('Error assigning pandit: $e');
       rethrow;
     }
   }
@@ -39,12 +35,10 @@ class BookingService {
   Future<void> updateBookingStatus(String bookingId, BookingStatus status) async {
     try {
       await _db.collection(_collectionPath).doc(bookingId).update({
-        'status': status.toString(),
+        'status': status.name,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      // ignore: avoid_print
-      print('Error updating booking status: $e');
       rethrow;
     }
   }
@@ -52,7 +46,7 @@ class BookingService {
   Future<void> updateBookingPaymentStatus(String bookingId, PaymentStatus status, [String? paymentId]) async {
     try {
       final updateData = {
-        'paymentStatus': status.toString(),
+        'paymentStatus': status.name,
         'updatedAt': FieldValue.serverTimestamp(),
       };
       if (paymentId != null) {
@@ -60,8 +54,6 @@ class BookingService {
       }
       await _db.collection(_collectionPath).doc(bookingId).update(updateData);
     } catch (e) {
-      // ignore: avoid_print
-      print('Error updating booking payment status: $e');
       rethrow;
     }
   }
@@ -74,7 +66,7 @@ class BookingService {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Booking.fromJson(doc.data()))
+            .map((doc) => Booking.fromFirestore(doc))
             .toList());
   }
 
@@ -85,18 +77,18 @@ class BookingService {
         .where('panditId', isEqualTo: panditId)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Booking.fromJson(doc.data()))
+            .map((doc) => Booking.fromFirestore(doc))
             .toList());
   }
-  
+
   // Get all available bookings for pandits to view
   Stream<List<Booking>> getAvailableBookings() {
     return _db
         .collection(_collectionPath)
-        .where('status', isEqualTo: BookingStatus.pending.toString())
+        .where('status', isEqualTo: BookingStatus.pending.name)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Booking.fromJson(doc.data()))
+            .map((doc) => Booking.fromFirestore(doc))
             .toList());
   }
 }

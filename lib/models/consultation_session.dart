@@ -24,6 +24,15 @@ abstract class ConsultationSession with _$ConsultationSession {
   factory ConsultationSession.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     data['id'] = doc.id;
+    if (data['startTime'] is Timestamp) {
+      data['startTime'] = (data['startTime'] as Timestamp).toDate().toIso8601String();
+    }
+    if (data['endTime'] is Timestamp) {
+      data['endTime'] = (data['endTime'] as Timestamp).toDate().toIso8601String();
+    }
+    if (data['createdAt'] is Timestamp) {
+      data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+    }
     return ConsultationSession.fromJson(data);
   }
 }

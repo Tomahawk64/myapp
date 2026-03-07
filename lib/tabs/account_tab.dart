@@ -1,7 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../user_model.dart';
+import '../models/app_user.dart';
 
 class AccountTab extends StatelessWidget {
   const AccountTab({super.key});

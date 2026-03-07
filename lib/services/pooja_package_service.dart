@@ -7,6 +7,8 @@ class PoojaPackageService extends FirestoreService<PoojaPackage> {
   PoojaPackageService() : super(
     'pooja_packages',
     (DocumentSnapshot doc) => PoojaPackage.fromFirestore(doc),
-    (PoojaPackage package) => package.toFirestore(),
+    (PoojaPackage package) => package.toJson(),
   );
+
+  Stream<List<PoojaPackage>> getPoojaPackages() => getAll();
 }

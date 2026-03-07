@@ -22,6 +22,12 @@ abstract class AppOrder with _$AppOrder {
   factory AppOrder.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     data['id'] = doc.id;
+    if (data['createdAt'] is Timestamp) {
+      data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+    }
+    if (data['updatedAt'] is Timestamp) {
+      data['updatedAt'] = (data['updatedAt'] as Timestamp).toDate().toIso8601String();
+    }
     return AppOrder.fromJson(data);
   }
 }

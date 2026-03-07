@@ -1,4 +1,5 @@
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,7 +11,7 @@ class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  _LoginScreenState createState() => _LoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
@@ -67,19 +68,43 @@ class _LoginScreenState extends State<LoginScreen> {
               ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    final user = await authService.signInWithEmailAndPassword(
-                      _emailController.text,
-                      _passwordController.text,
-                    );
-                    if (user == null) {
-                      setState(() {
-                        _error = 'Invalid email or password';
-                      });
-                    } else {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const Wrapper()),
+                    try {
+                      setState(() => _error = '');
+                      final navigator = Navigator.of(context);
+                      final user = await authService.signInWithEmailAndPassword(
+                        _emailController.text.trim(),
+                        _passwordController.text,
                       );
+                      if (user != null && mounted) {
+                        navigator.pushReplacement(
+                          MaterialPageRoute(builder: (context) => const Wrapper()),
+                        );
+                      }
+                    } on FirebaseAuthException catch (e) {
+                      setState(() {
+                        switch (e.code) {
+                          case 'user-not-found':
+                            _error = 'No account found with that email.';
+                            break;
+                          case 'wrong-password':
+                          case 'invalid-credential':
+                            _error = 'Incorrect password. Please try again.';
+                            break;
+                          case 'invalid-email':
+                            _error = 'The email address is not valid.';
+                            break;
+                          case 'user-disabled':
+                            _error = 'This account has been disabled.';
+                            break;
+                          case 'too-many-requests':
+                            _error = 'Too many attempts. Please try again later.';
+                            break;
+                          default:
+                            _error = 'Login failed. Please try again.';
+                        }
+                      });
+                    } catch (e) {
+                      setState(() => _error = 'An unexpected error occurred.');
                     }
                   }
                 },
@@ -93,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
               TextButton(
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SignUpScreen()),
+                  MaterialPageRoute(builder: (context) => const SignupScreen()),
                 ),
                 child: const Text('Don\'t have an account? Sign up'),
               ),

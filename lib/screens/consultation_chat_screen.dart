@@ -4,10 +4,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/user.dart';
+import '../models/app_user.dart';
 import '../models/chat_message.dart';
 import '../models/consultation_session.dart';
+import '../models/consultation_status.dart';
 import '../services/consultation_session_service.dart';
+import 'video_call_screen.dart';
 
 class ConsultationChatScreen extends StatefulWidget {
   final String sessionId;
@@ -21,24 +23,19 @@ class ConsultationChatScreen extends StatefulWidget {
 class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
   final _messageController = TextEditingController();
   Timer? _uiUpdateTimer;
+  final ConsultationSessionService _consultationService = ConsultationSessionService();
 
   @override
   void initState() {
     super.initState();
-    final consultationService = Provider.of<ConsultationSessionService>(context, listen: false);
 
-    // Attempt to start the session. The service handles the logic.
-    // This should ideally be triggered by a more explicit user action.
-    consultationService.startSession(widget.sessionId).catchError((e) {
-      // Handle cases where the session can't be started, e.g., show a dialog
+    _consultationService.startSession(widget.sessionId).catchError((e) {
       debugPrint("Error starting session: $e");
     });
 
-    // This timer is only for updating the UI every second to show a live countdown.
-    // It does not control the session's actual state.
     _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
-        setState(() {}); // Force a rebuild to update the countdown timer display
+        setState(() {});
       }
     });
   }
@@ -53,14 +50,13 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AppUser?>(context);
-    final consultationService = Provider.of<ConsultationSessionService>(context, listen: false);
 
     return StreamProvider<ConsultationSession?>.value(
-      value: consultationService.getSessionStream(widget.sessionId),
+      value: _consultationService.getSessionStream(widget.sessionId),
       initialData: null,
       catchError: (_, error) {
         debugPrint("Error in session stream: $error");
-        return null; // Return null or a default session object on error
+        return null;
       },
       child: Consumer<ConsultationSession?>(
         builder: (context, session, _) {
@@ -71,15 +67,13 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
             );
           }
 
-          // UI-only calculation for remaining time.
           Duration remainingTime = Duration.zero;
-          bool isSessionActive = session.status == ConsultationStatus.active && session.endTime != null;
+          bool isSessionActive = session.status == ConsultationStatus.active.name && session.endTime != null;
 
           if (isSessionActive) {
             remainingTime = session.endTime!.difference(DateTime.now());
             if (remainingTime.isNegative) {
               remainingTime = Duration.zero;
-              // The session has expired. The UI will update, and server rules will block new messages.
             }
           }
 
@@ -90,6 +84,20 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
             appBar: AppBar(
               title: const Text('Live Consultation'),
               actions: [
+                if (isSessionActive && session.channelId != null)
+                  IconButton(
+                    icon: const Icon(Icons.videocam),
+                    tooltip: 'Join Video Call',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VideoCallScreen(
+                          channelId: session.channelId!,
+                          sessionId: widget.sessionId,
+                        ),
+                      ),
+                    ),
+                  ),
                 if (isSessionActive)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -109,14 +117,13 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
               children: [
                 Expanded(
                   child: StreamProvider<List<ChatMessage>>.value(
-                    value: consultationService.getMessages(widget.sessionId),
+                    value: _consultationService.getMessages(widget.sessionId),
                     initialData: const [],
-                    child: const MessageList(),
+                    child: MessageList(currentUser: user),
                   ),
                 ),
-                // Show input field only if the session is active and time remains.
                 if (isSessionActive && remainingTime > Duration.zero)
-                  _buildMessageInputField(context, user, consultationService, session)
+                  _buildMessageInputField(context, user, session)
                 else
                   _buildSessionEndedBanner(session.status),
               ],
@@ -127,20 +134,16 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
     );
   }
 
-  Widget _buildSessionEndedBanner(ConsultationStatus status) {
+  Widget _buildSessionEndedBanner(String status) {
     String message;
-    switch (status) {
-      case ConsultationStatus.completed:
-        message = 'This session has been completed.';
-        break;
-      case ConsultationStatus.expired:
-        message = 'This session has expired.';
-        break;
-      case ConsultationStatus.cancelled:
-        message = 'This session was cancelled.';
-        break;
-      default:
-        message = 'The chat is currently unavailable.';
+    if (status == ConsultationStatus.completed.name) {
+      message = 'This session has been completed.';
+    } else if (status == ConsultationStatus.expired.name) {
+      message = 'This session has expired.';
+    } else if (status == ConsultationStatus.cancelled.name) {
+      message = 'This session was cancelled.';
+    } else {
+      message = 'The chat is currently unavailable.';
     }
     return Container(
       padding: const EdgeInsets.all(16),
@@ -153,7 +156,6 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
   Widget _buildMessageInputField(
     BuildContext context,
     AppUser? user,
-    ConsultationSessionService consultationService,
     ConsultationSession session,
   ) {
     return Padding(
@@ -169,21 +171,21 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
                   borderRadius: BorderRadius.all(Radius.circular(20)),
                 ),
               ),
-              onSubmitted: (text) => _sendMessage(user, consultationService, session.id),
+              onSubmitted: (text) => _sendMessage(user, session.id),
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.send),
-            onPressed: () => _sendMessage(user, consultationService, session.id),
+            onPressed: () => _sendMessage(user, session.id),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
-              // This should eventually be tied to a payment flow.
-              consultationService.extendSession(widget.sessionId, 10).then((_) {
+              final messenger = ScaffoldMessenger.of(context);
+              _consultationService.extendSession(widget.sessionId, 10).then((_) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     const SnackBar(content: Text('Session extended by 10 minutes!')),
                   );
                 }
@@ -196,17 +198,17 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
     );
   }
 
-  void _sendMessage(AppUser? user, ConsultationSessionService consultationService, String sessionId) {
+  void _sendMessage(AppUser? user, String sessionId) {
     if (_messageController.text.isNotEmpty && user != null) {
       final message = ChatMessage(
         id: '',
         sessionId: sessionId,
         senderId: user.id,
         messageType: MessageType.text,
-        content: _messageController.text,
-        timestamp: DateTime.now(), // Firestore will use server timestamp eventually
+        messageText: _messageController.text,
+        timestamp: DateTime.now(),
       );
-      consultationService.sendMessage(message).catchError((e) {
+      _consultationService.sendMessage(message).catchError((e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Failed to send message: ${e.toString()}')),
@@ -219,14 +221,15 @@ class _ConsultationChatScreenState extends State<ConsultationChatScreen> {
 }
 
 class MessageList extends StatelessWidget {
-  const MessageList({super.key});
+  final AppUser? currentUser;
+
+  const MessageList({super.key, required this.currentUser});
 
   @override
   Widget build(BuildContext context) {
     final messages = Provider.of<List<ChatMessage>>(context);
-    final user = Provider.of<AppUser?>(context);
 
-    if (user == null) {
+    if (currentUser == null) {
       return const Center(child: Text("Not logged in."));
     }
 
@@ -236,7 +239,7 @@ class MessageList extends StatelessWidget {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
-        final isMe = message.senderId == user.id;
+        final isMe = message.senderId == currentUser!.id;
         return Align(
           alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
@@ -247,7 +250,7 @@ class MessageList extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
-              message.content,
+              message.messageText ?? '',
               style: TextStyle(color: isMe ? Colors.white : Colors.black),
             ),
           ),

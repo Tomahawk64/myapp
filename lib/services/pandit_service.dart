@@ -7,6 +7,6 @@ class PanditService {
 
   Stream<List<PanditProfile>> getPandits() {
     return _db.collection('pandits').snapshots().map((snapshot) =>
-        snapshot.docs.map((doc) => PanditProfile.fromJson(doc.data())).toList());
+        snapshot.docs.map((doc) => PanditProfile.fromFirestore(doc)).toList());
   }
 }

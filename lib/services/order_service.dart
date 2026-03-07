@@ -7,6 +7,6 @@ class OrderService extends FirestoreService<AppOrder> {
   OrderService() : super(
     'orders',
     (DocumentSnapshot doc) => AppOrder.fromFirestore(doc),
-    (AppOrder order) => order.toFirestore(),
+    (AppOrder order) => order.toJson(),
   );
 }

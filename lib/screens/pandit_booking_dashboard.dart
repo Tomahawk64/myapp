@@ -84,10 +84,9 @@ class AvailableBookingList extends StatelessWidget {
                   children: [
                     TextButton(
                       onPressed: () {
-                        // Placeholder for rejecting the booking
-                        // ignore: avoid_print
-                        print('Rejecting booking: ${booking.id}');
+                        BookingService().updateBookingStatus(booking.id, BookingStatus.cancelled);
                       },
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
                       child: const Text('Reject'),
                     ),
                     const SizedBox(width: 8),

@@ -1,17 +1,15 @@
-
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class VideoUploadScreen extends StatefulWidget {
-  final String bookingId; // To associate the video with a specific booking
+  final String bookingId;
 
   const VideoUploadScreen({super.key, required this.bookingId});
 
   @override
-  _VideoUploadScreenState createState() => _VideoUploadScreenState();
+  State<VideoUploadScreen> createState() => _VideoUploadScreenState();
 }
 
 class _VideoUploadScreenState extends State<VideoUploadScreen> {
@@ -22,15 +20,26 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
   Future<void> _pickVideo() async {
     final ImagePicker picker = ImagePicker();
     final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
-    setState(() {
-      _videoFile = video;
-    });
+    if (video != null) {
+      setState(() {
+        _videoFile = video;
+      });
+    }
   }
 
   Future<void> _uploadVideo() async {
     if (_videoFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a video first.')),
+      );
+      return;
+    }
+
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video upload is available on mobile only.'),
+        ),
       );
       return;
     }
@@ -45,31 +54,37 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
           .ref()
           .child('pooja_proof_videos/${widget.bookingId}/${DateTime.now().millisecondsSinceEpoch}.mp4');
 
-      final uploadTask = storageRef.putFile(File(_videoFile!.path));
+      final bytes = await _videoFile!.readAsBytes();
+      final uploadTask = storageRef.putData(bytes);
 
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        setState(() {
-          _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
-        });
+        if (mounted) {
+          setState(() {
+            _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
+          });
+        }
       });
 
       await uploadTask;
       final downloadUrl = await storageRef.getDownloadURL();
 
-      // Here you would typically save the downloadUrl to your Firestore database
-      // associated with the booking.
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Upload successful! URL: $downloadUrl')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload successful! URL: $downloadUrl')),
+        );
+      }
     } on FirebaseException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload video: ${e.message}')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload video: ${e.message}')),
+        );
+      }
     } finally {
-      setState(() {
-        _isUploading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
+      }
     }
   }
 
@@ -84,10 +99,19 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
+            children: [
               _videoFile == null
-                  ? const Text('No video selected.')
-                  : Text('Selected video: ${_videoFile!.path.split('/').last}'),
+                  ? const Column(
+                      children: [
+                        Icon(Icons.video_library, size: 64, color: Colors.grey),
+                        SizedBox(height: 8),
+                        Text('No video selected.', style: TextStyle(color: Colors.grey)),
+                      ],
+                    )
+                  : Text(
+                      'Selected: ${_videoFile!.name}',
+                      textAlign: TextAlign.center,
+                    ),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: _pickVideo,
@@ -95,9 +119,12 @@ class _VideoUploadScreenState extends State<VideoUploadScreen> {
                 label: const Text('Select Video'),
               ),
               const SizedBox(height: 20),
-              if (_isUploading)
+              if (_isUploading) ...[
                 LinearProgressIndicator(value: _uploadProgress),
-              const SizedBox(height: 20),
+                const SizedBox(height: 8),
+                Text('${(_uploadProgress * 100).toStringAsFixed(0)}%'),
+                const SizedBox(height: 20),
+              ],
               ElevatedButton.icon(
                 onPressed: _isUploading ? null : _uploadVideo,
                 icon: const Icon(Icons.cloud_upload),

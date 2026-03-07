@@ -1,5 +1,7 @@
 {
-  "projects": {},
+  "projects": {
+    "default": "fir-pooja-61114"
+  },
   "targets": {},
   "etags": {}
 }

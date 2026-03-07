@@ -7,6 +7,6 @@ class ChatMessageService extends FirestoreService<ChatMessage> {
   ChatMessageService() : super(
     'chat_messages',
     (DocumentSnapshot doc) => ChatMessage.fromFirestore(doc),
-    (ChatMessage message) => message.toFirestore(),
+    (ChatMessage message) => message.toJson(),
   );
 }

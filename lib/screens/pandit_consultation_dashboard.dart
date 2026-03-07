@@ -2,8 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/user.dart';
+import '../models/app_user.dart';
 import '../models/consultation_session.dart';
+import '../services/consultation_session_service.dart';
 import 'consultation_chat_screen.dart';
 
 class PanditConsultationDashboard extends StatelessWidget {
@@ -12,7 +13,7 @@ class PanditConsultationDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AppUser?>(context);
-    final consultationService = Provider.of<ConsultationSessionService>(context, listen: false);
+    final consultationService = ConsultationSessionService();
     final panditId = user?.id ?? '';
 
     return Scaffold(
@@ -47,7 +48,7 @@ class PanditConsultationList extends StatelessWidget {
           margin: const EdgeInsets.all(16),
           child: ListTile(
             title: Text('Consultation with ${session.userId}'),
-            subtitle: Text('Status: ${session.status.toString().split('.').last}'),
+            subtitle: Text('Status: ${session.status}'),
             onTap: () {
               Navigator.push(
                 context,

@@ -27,8 +27,10 @@ class BookingHistoryScreen extends StatelessWidget {
             ],
           ),
         ),
-        body: StreamProvider<List<Booking>>.value(
-          value: BookingService().getUserBookings(user!.id),
+        body: user == null
+            ? const Center(child: CircularProgressIndicator())
+            : StreamProvider<List<Booking>>.value(
+          value: BookingService().getUserBookings(user.id),
           initialData: const [],
           child: TabBarView(
             children: [
@@ -74,10 +76,9 @@ class BookingList extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
-                Text('Date: ${booking.date.toLocal()} '.split(' ')[0]),
-                // Text('Time: ${booking.time}'),
-                Text('Price: \$${booking.price.toStringAsFixed(2)}'),
-                Text('Status: ${booking.status.toString().split('.').last}'),
+                Text('Date: ${booking.date.toLocal().toString().split(' ').first}'),
+                Text('Price: ₹${booking.price.toStringAsFixed(2)}'),
+                Text('Status: ${booking.status.name}'),
                 if (booking.status == BookingStatus.completed && booking.panditId != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16.0),

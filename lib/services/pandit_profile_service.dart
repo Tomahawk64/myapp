@@ -7,6 +7,6 @@ class PanditProfileService extends FirestoreService<PanditProfile> {
   PanditProfileService() : super(
     'pandit_profiles',
     (DocumentSnapshot doc) => PanditProfile.fromFirestore(doc),
-    (PanditProfile profile) => profile.toFirestore(),
+    (PanditProfile profile) => profile.toJson(),
   );
 }

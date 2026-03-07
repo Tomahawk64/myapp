@@ -16,11 +16,22 @@ class AuthService {
     }
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(user.uid).get();
-      return AppUser.fromFirestore(doc.data() as Map<String, dynamic>?, user.uid);
+      if (doc.exists) {
+        return AppUser.fromFirestore(doc);
+      }
+      return AppUser(
+        id: user.uid,
+        email: user.email ?? '',
+        role: UserRole.user,
+        createdAt: DateTime.now(),
+      );
     } catch (e) {
-      // ignore: avoid_print
-      print('Error fetching user data: $e');
-      return AppUser(uid: user.uid, email: user.email, role: UserRole.USER);
+      return AppUser(
+        id: user.uid,
+        email: user.email ?? '',
+        role: UserRole.user,
+        createdAt: DateTime.now(),
+      );
     }
   }
 
@@ -31,54 +42,41 @@ class AuthService {
 
   // Sign in with email & password
   Future<AppUser?> signInWithEmailAndPassword(String email, String password) async {
-    try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      User? user = result.user;
-      if (user != null) {
-        // Get device token and save it
-        String? token = await _fcm.getToken();
+    final result = await _auth.signInWithEmailAndPassword(email: email, password: password);
+    final user = result.user;
+    if (user != null) {
+      try {
+        final token = await _fcm.getToken();
         await _db.collection('users').doc(user.uid).update({'deviceToken': token});
-            }
-      return await _userFromFirebaseUser(user);
-    } catch (e) {
-      // ignore: avoid_print
-      print(e.toString());
-      return null;
+      } catch (_) {}
     }
+    return await _userFromFirebaseUser(user);
   }
 
   // Register with email & password
   Future<AppUser?> createUserWithEmailAndPassword(
       String email, String password) async {
-    try {
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      User? user = result.user;
-      if (user != null) {
-        // Get device token and save it
-        String? token = await _fcm.getToken();
+    final result = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final user = result.user;
+    if (user != null) {
+      // Get device token and save it
+      final token = await _fcm.getToken();
 
-        // Create a new document for the user with the uid
-        final newUser = AppUser(
-          uid: user.uid,
-          email: user.email,
-          role: UserRole.USER, // Default role
-          deviceToken: token,
-        );
-        await _db.collection('users').doc(user.uid).set(newUser.toFirestore());
-        return newUser;
-      }
-      return null;
-    } catch (e) {
-      // ignore: avoid_print
-      print(e.toString());
-      return null;
+      // Create a new document for the user with the uid
+      final newUser = AppUser(
+        id: user.uid,
+        email: user.email ?? '',
+        role: UserRole.user,
+        createdAt: DateTime.now(),
+        deviceToken: token,
+      );
+      await _db.collection('users').doc(user.uid).set(newUser.toJson());
+      return newUser;
     }
+    return null;
   }
 
   // Sign out

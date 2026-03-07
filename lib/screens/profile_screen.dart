@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/user.dart';
+import '../models/app_user.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 
@@ -24,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.didChangeDependencies();
     final user = Provider.of<AppUser?>(context);
     if (user != null) {
-      _nameController.text = user.name ?? '';
+      _nameController.text = user.displayName ?? '';
     }
   }
 
@@ -39,18 +39,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _formKey.currentState!.save();
       final user = Provider.of<AppUser?>(context, listen: false);
       if (user != null) {
-        // Create a new AppUser with the updated name
-        final updatedUser = user.copyWith(name: _nameController.text);
-        
+        final updatedUser = user.copyWith(displayName: _nameController.text);
+
         try {
-          await _userService.updateUser(updatedUser);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
-          );
+          await _userService.update(user.id, updatedUser);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile updated successfully!')),
+            );
+          }
         } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating profile: $e')),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error updating profile: $e')),
+            );
+          }
         }
       }
     }
@@ -112,9 +115,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   backgroundColor: Colors.red,
                 ),
                 onPressed: () async {
+                  final navigator = Navigator.of(context);
                   await _authService.signOut();
-                  // After signing out, pop until we are at the root of the navigation stack
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  if (mounted) {
+                    navigator.popUntil((route) => route.isFirst);
+                  }
                 },
                 child: const Text('Logout'),
               ),

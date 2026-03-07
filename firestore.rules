@@ -3,60 +3,159 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the user has a specific role
-    function hasRole(role) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    // ── Helper functions ───────────────────────────────────────────────────
+
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Users can read their own user document
-    // Users cannot change their own role
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Roles stored as lowercase: 'user', 'pandit', 'admin'
+    function callerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && callerRole() == 'admin';
+    }
+
+    function isPandit() {
+      return isAuthenticated() && callerRole() == 'pandit';
+    }
+
+    // ── users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if request.auth.uid == userId;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId && request.resource.data.role == resource.data.role;
-      allow delete: if hasRole('ADMIN');
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId);
+      // Prevent self-escalation: role field must not change
+      allow update: if isAuthenticated() && isOwner(userId)
+                    && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
     }
 
-    // Bookings can be read by the user who created them or by a pandit or admin
-    // Bookings can only be created by authenticated users
-    // Bookings can only be updated by the user who created them (for cancellation), or by a pandit or admin
+    // ── bookings ───────────────────────────────────────────────────────────
     match /bookings/{bookingId} {
-      allow read: if resource.data.userId == request.auth.uid || hasRole('PANDIT') || hasRole('ADMIN');
-      allow create: if request.auth.uid != null;
-      allow update: if (resource.data.userId == request.auth.uid && request.resource.data.status == 'Cancelled') || hasRole('PANDIT') || hasRole('ADMIN');
-      allow delete: if hasRole('ADMIN');
+      allow read: if isAuthenticated()
+                  && (resource.data.userId == request.auth.uid
+                      || resource.data.panditId == request.auth.uid
+                      || isAdmin());
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+                    && (
+                        (resource.data.userId == request.auth.uid
+                          && request.resource.data.status == 'cancelled')
+                        || (resource.data.panditId == request.auth.uid && isPandit())
+                        || isAdmin()
+                    );
+      allow delete: if isAdmin();
     }
 
-    // Pandits can be read by any authenticated user
-    // Pandits can only be created, updated, or deleted by an admin
+    // ── consultation_sessions ──────────────────────────────────────────────
+    match /consultation_sessions/{sessionId} {
+      allow read, update: if isAuthenticated()
+                          && (resource.data.userId == request.auth.uid
+                              || resource.data.panditId == request.auth.uid
+                              || isAdmin());
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ── consultation_slots ─────────────────────────────────────────────────
+    // Admin-managed time windows that users can browse and book
+    match /consultation_slots/{slotId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── chat_messages ──────────────────────────────────────────────────────
+    match /chat_messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── pandit_profiles ────────────────────────────────────────────────────
+    match /pandit_profiles/{panditId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(panditId);
+      allow update: if isAuthenticated()
+                    && (
+                        (isOwner(panditId) && isPandit()
+                          && request.resource.data.isVerified == resource.data.isVerified)
+                        || isAdmin()
+                    );
+      allow delete: if isAdmin();
+    }
+
+    // ── pandits (legacy) ───────────────────────────────────────────────────
     match /pandits/{panditId} {
-      allow read: if request.auth.uid != null;
-      allow create, update, delete: if hasRole('ADMIN');
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Consultations can be read by the user or the pandit involved, or by an admin
-    // Consultations can be created by any authenticated user
-    // Consultations can be updated by the user or the pandit involved, or by an admin
-    match /consultations/{consultationId} {
-      allow read, update: if resource.data.userId == request.auth.uid || resource.data.panditId == request.auth.uid || hasRole('ADMIN');
-      allow create: if request.auth.uid != null;
-      allow delete: if hasRole('ADMIN');
+    // ── pooja_packages ─────────────────────────────────────────────────────
+    match /pooja_packages/{packageId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
-    // Reviews can be read by anyone
-    // Reviews can be created by any authenticated user
-    // Reviews can only be updated or deleted by an admin
+    // ── poojas (legacy) ────────────────────────────────────────────────────
+    match /poojas/{poojaId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── reviews ────────────────────────────────────────────────────────────
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if request.auth.uid != null;
-      allow update, delete: if hasRole('ADMIN');
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
 
-    // Products can be read by anyone
-    // Products can only be created, updated, or deleted by an admin
+    // ── orders ─────────────────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read: if isAuthenticated()
+                  && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated()
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated()
+                    && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ── shop products ──────────────────────────────────────────────────────
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if hasRole('ADMIN');
+      allow create, update, delete: if isAdmin();
     }
+
+    match /shop_products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── special_poojas ─────────────────────────────────────────────────────
+    match /special_poojas/{poojaId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── notifications ──────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated()
+                  && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated()
+                    && resource.data.userId == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['isRead', 'updatedAt']);
+      allow delete: if isAdmin();
+    }
+
   }
 }

@@ -1,4 +1,5 @@
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,7 +10,7 @@ class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
   @override
-  _SignupScreenState createState() => _SignupScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
 class _SignupScreenState extends State<SignupScreen> {
@@ -66,19 +67,36 @@ class _SignupScreenState extends State<SignupScreen> {
               ElevatedButton(
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    final user = await authService.createUserWithEmailAndPassword(
-                      _emailController.text,
-                      _passwordController.text,
-                    );
-                    if (user == null) {
-                      setState(() {
-                        _error = 'An error occurred. Please try again later.';
-                      });
-                    } else {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const Wrapper()),
+                    try {
+                      setState(() => _error = '');
+                      final navigator = Navigator.of(context);
+                      final user = await authService.createUserWithEmailAndPassword(
+                        _emailController.text.trim(),
+                        _passwordController.text,
                       );
+                      if (user != null && mounted) {
+                        navigator.pushReplacement(
+                          MaterialPageRoute(builder: (context) => const Wrapper()),
+                        );
+                      }
+                    } on FirebaseAuthException catch (e) {
+                      setState(() {
+                        switch (e.code) {
+                          case 'weak-password':
+                            _error = 'Password must be at least 6 characters.';
+                            break;
+                          case 'email-already-in-use':
+                            _error = 'An account already exists with that email.';
+                            break;
+                          case 'invalid-email':
+                            _error = 'The email address is not valid.';
+                            break;
+                          default:
+                            _error = 'Sign up failed. Please try again.';
+                        }
+                      });
+                    } catch (e) {
+                      setState(() => _error = 'An unexpected error occurred.');
                     }
                   }
                 },

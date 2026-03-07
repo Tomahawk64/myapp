@@ -1,0 +1,16 @@
+{
+  "name": "pandit-app-seed",
+  "version": "1.0.0",
+  "description": "Firestore seeding script for Pandit App",
+  "main": "seed.js",
+  "scripts": {
+    "seed": "node seed.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "firebase-admin": "^11.11.0"
+  },
+  "private": true
+}

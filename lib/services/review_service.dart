@@ -12,8 +12,6 @@ class ReviewService {
       final docRef = _db.collection(_collectionPath).doc();
       await docRef.set(review.copyWith(id: docRef.id).toJson());
     } catch (e) {
-      // ignore: avoid_print
-      print('Error creating review: $e');
       rethrow;
     }
   }
@@ -22,18 +20,20 @@ class ReviewService {
   Stream<List<Review>> getPanditReviews(String panditId) {
     return _db
         .collection(_collectionPath)
-        .where('panditId', isEqualTo: panditId)
+        .where('entityId', isEqualTo: panditId)
+        .where('entityType', isEqualTo: 'pandit')
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
-            snapshot.docs.map((doc) => Review.fromJson(doc.data())).toList());
+            snapshot.docs.map((doc) => Review.fromFirestore(doc)).toList());
   }
 
   // Get the average rating for a specific pandit
   Stream<double> getPanditAverageRating(String panditId) {
     return _db
         .collection(_collectionPath)
-        .where('panditId', isEqualTo: panditId)
+        .where('entityId', isEqualTo: panditId)
+        .where('entityType', isEqualTo: 'pandit')
         .snapshots()
         .map((snapshot) {
       if (snapshot.docs.isEmpty) {

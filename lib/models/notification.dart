@@ -21,6 +21,14 @@ abstract class AppNotification with _$AppNotification {
   factory AppNotification.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     data['id'] = doc.id;
+    if (data['createdAt'] is Timestamp) {
+      data['createdAt'] = (data['createdAt'] as Timestamp).toDate().toIso8601String();
+    }
+    if (data['updatedAt'] is Timestamp) {
+      data['updatedAt'] = (data['updatedAt'] as Timestamp).toDate().toIso8601String();
+    }
+    data['createdAt'] ??= DateTime.now().toIso8601String();
+    data['updatedAt'] ??= DateTime.now().toIso8601String();
     return AppNotification.fromJson(data);
   }
 }
